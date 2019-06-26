@@ -637,23 +637,9 @@ def gameLoop():
 
         pg.display.update()
 
-    t = []
-    for x in range(0, 8000, 40):
-        for y in range(0, 1000, 40):
-            for platform in platforms:
-                if platform.x == x and platform.y == y:
-                    i = 0
-                    for h in all_blocks:
-                        if h == platform.texture:
-                            t.append([i, x, y, platform.diggable, platform.hardness, platform.break_level])
-                            break
-                        i += 1
-            t.append([None, x, y, False, 0, 0])
-    print(t)
-
     fps = 0
 
-    while False:
+    while not done:
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 done = True
