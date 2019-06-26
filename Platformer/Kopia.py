@@ -141,24 +141,27 @@ def gameLoop():
             if self.wait_for_weapon > 0:
                 self.wait_for_weapon -= 1
 
+            if mouse_pressed[0] and self.currently_held[0] == 'Weapon':
+                self.attack()
+
         def choose_slot(self):
             if keys[pg.K_1]:
                 self.currently_held_num = 0
-            if keys[pg.K_2]:
+            elif keys[pg.K_2]:
                 self.currently_held_num = 1
-            if keys[pg.K_3]:
+            elif keys[pg.K_3]:
                 self.currently_held_num = 2
-            if keys[pg.K_4]:
+            elif keys[pg.K_4]:
                 self.currently_held_num = 3
-            if keys[pg.K_5]:
+            elif keys[pg.K_5]:
                 self.currently_held_num = 4
-            if keys[pg.K_6]:
+            elif keys[pg.K_6]:
                 self.currently_held_num = 5
-            if keys[pg.K_7]:
+            elif keys[pg.K_7]:
                 self.currently_held_num = 6
-            if keys[pg.K_8]:
+            elif keys[pg.K_8]:
                 self.currently_held_num = 7
-            if keys[pg.K_9]:
+            elif keys[pg.K_9]:
                 self.currently_held_num = 8
             if mouse_pressed[0] and mouse_y in range(880, 929):
                 slot_counter = 0
@@ -178,7 +181,7 @@ def gameLoop():
                 position_bias -= int(self.velx)
             if position_bias > 0:
                 position_bias = 0
-            if self.y > height or self.x > width_of_map - 600:
+            if self.y > height or self.x > width_of_map - 600 and not debug:
                 self.alive = False
 
         def place_a_ghost_block(self):
@@ -189,8 +192,9 @@ def gameLoop():
             if mouse_pressed[0]:
                 for platform in platforms:
                     if mouse_x - position_bias - (mouse_x - position_bias) % 40 in range(platform.x, platform.x +
-                        platform.width) and mouse_y - mouse_y % 40 in range(platform.y, platform.y + platform.height):
-                        if ((mouse_x - self.x - position_bias) ** 2 + (mouse_y - self.y) ** 2) ** 0.5 < 200:
+                            platform.width) and mouse_y - mouse_y % 40 in range(platform.y, platform.y +
+                            platform.height) and platform.diggable:
+                        if ((mouse_x - self.x - position_bias) ** 2 + (mouse_y - self.y) ** 2) < 40000:
                             platform.break_level -= 1
                             self.currently_breaked_block = platform
                             if platform.break_level == 0:
@@ -203,14 +207,18 @@ def gameLoop():
 
         def place_a_block(self):
             if mouse_pressed[2] and self.currently_held[0] == 'Block' and self.currently_held[1] > 0 and \
-                    ((mouse_x - self.x - position_bias) ** 2 + (mouse_y - self.y) ** 2) ** 0.5 < 200:
+                    ((mouse_x - self.x - position_bias) ** 2 + (mouse_y - self.y) ** 2) < 40000:
                 for platform in platforms:
                     if mouse_x - position_bias - (mouse_x - position_bias) % 40 in range(platform.x, platform.x +
                         platform.width) and mouse_y - mouse_y % 40 in range(platform.y, platform.y + platform.height):
                         return 0
                 platforms.append(Platform(mouse_x - position_bias, mouse_y, self.currently_held[2]))
-                self.currently_held[1] -= 1
-                placing_sound.play(0)
+                offset = int(platforms[-1].x - self.x), int(platforms[-1].y - self.y)
+                if self.mask.overlap(pg.mask.from_surface(platforms[-1].texture), offset):
+                    platforms.pop(-1)
+                else:
+                    self.currently_held[1] -= 1
+                    placing_sound.play(0)
 
         def grab_grabbables(self):
             for grabbable in grabbables:
@@ -219,10 +227,13 @@ def gameLoop():
                     grabbable.effect()
                     grabbables.remove(grabbable)
 
+        def attack(self):
+            print('Hello zombie!')
+
         def collide_with_enemies(self):
             for enemy in enemies:
                 offset = int(enemy.x - self.x), int(enemy.y - self.y)
-                if enemy.mask.overlap(self.mask, offset) and enemy.alive:
+                if enemy.mask.overlap(self.mask, offset) and enemy.alive and not debug:
                     self.alive = False
 
         def collide_with_platforms(self):
@@ -402,20 +413,20 @@ def gameLoop():
         def draw(self):
             display.blit(self.sprite, (self.x + position_bias, self.y))
 
-    player = Character(220, 404)
+    player = Character(7220, 404)
 
-    position_bias = -(player.x - 220)
+    position_bias = -(player.x - 220) + 1000
 
     enemies = []
 
     class Platform(object):
-        def __init__(self, x, y, texture=dirt_block, collisions=True):
+        def __init__(self, x, y, texture=dirt_block, diggable=True):
             self.x = x - x % 40
             self.y = y - y % 40
             self.width = 40
             self.height = 40
             self.texture = texture
-            self.collistions = collisions
+            self.diggable = diggable
             self.hardness = 1
             self.break_level = self.hardness * 50
 
@@ -433,6 +444,10 @@ def gameLoop():
             self.bias_direction = 1
             self.mask = pg.mask.from_surface(self.type)
             if self.type in all_blocks:
+                if self.type == grass_block:
+                    self.type = dirt_block
+                elif self.type == stone_block:
+                    self.type = cobblestone_block
                 self.width = 20
                 self.height = 20
             else:
@@ -473,22 +488,41 @@ def gameLoop():
 
     bullets = []
 
-    platforms = [  # cave
-                 Platform(6960, 480, stone_block),
-                 Platform(7000, 440, stone_block),
-                 Platform(7080, 360, stone_block),
-                 Platform(7120, 320, stone_block),
-                 Platform(7240, 280, stone_block),
-                 Platform(7320, 0, stone_block),
-                 Platform(7000, 720)]
+    platforms = []
 
     for x in range(0, 7000, 40):
         platforms.append(Platform(x, 720, grass_block))
+
     for x in range(0, 7000, 40):
         platforms.append(Platform(x, 760))
-    for x in range(0, 7000, 40):
+
+    for x in range(0, 8000, 40):
         for y in range(800, 961, 40):
             platforms.append(Platform(x, y, stone_block))
+
+    for x in range(7000, 8000, 40):
+        for y in range(440, 481, 40):
+            platforms.append(Platform(x, y, stone_block, False))
+
+    for x in range(7000, 8000, 40):
+        for y in range(440, 481, 40):
+            platforms.append(Platform(x, y, stone_block, False))
+
+    for x in range(7080, 8000, 40):
+        for y in range(360, 401, 40):
+            platforms.append(Platform(x, y, stone_block, False))
+
+    for x in range(7240, 8000, 40):
+        for y in range(280, 321, 40):
+            platforms.append(Platform(x, y, stone_block, False))
+
+    for x in range(7320, 8000, 40):
+        for y in range(0, 241, 40):
+            platforms.append(Platform(x, y, stone_block, False))
+
+    for x in range(7000, 8000, 40):
+        for y in range(720, 761, 40):
+            platforms.append(Platform(x, y))
 
     for y in range(0, 1000):
         platforms.append(Platform(-40, y, False))
@@ -632,7 +666,7 @@ def gameLoop():
         if keys[pg.K_r]:
             restart()
 
-        if player.alive:
+        if player.alive and player.health > 0:
             player.currently_breaked_block = None
             player.controls()
             player.move()
