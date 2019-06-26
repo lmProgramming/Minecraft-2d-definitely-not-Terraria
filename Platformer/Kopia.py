@@ -413,9 +413,9 @@ def gameLoop():
         def draw(self):
             display.blit(self.sprite, (self.x + position_bias, self.y))
 
-    player = Character(7220, 404)
+    player = Character(220, 404)
 
-    position_bias = -(player.x - 220) + 1000
+    position_bias = -(player.x - 220)
 
     enemies = []
 
@@ -477,14 +477,14 @@ def gameLoop():
                 if self.real_y + self.height + 19 == platform.y and self.x in \
                         range(platform.x, platform.x + platform.width):
                     self.real_y -= 1
+                    grabbable.change_bias()
                     break
             self.y = self.real_y
 
         def draw(self):
-            if self.x in range(int(player.x) - width, int(player.x) + width):
-                if self.type in all_blocks:
-                    display.blit(pg.transform.scale(self.type, (20, 20)),
-                                 (self.x + position_bias + 10, self.y + self.y_bias))
+            if self.type in all_blocks:
+                display.blit(pg.transform.scale(self.type, (20, 20)), (self.x + position_bias + 10, self.y +
+                                                                       self.y_bias))
 
     bullets = []
 
@@ -522,7 +522,7 @@ def gameLoop():
 
     for x in range(7000, 8000, 40):
         for y in range(720, 761, 40):
-            platforms.append(Platform(x, y))
+            platforms.append(Platform(x, y, stone_block, False))
 
     for y in range(0, 1000):
         platforms.append(Platform(-40, y, False))
@@ -561,14 +561,15 @@ def gameLoop():
             this_x -= 45
 
     def place_cracks():
-        for platform in platforms:
-            if platform == player.currently_breaked_block:
-                loop_number = 0
-                for i in range(0, platform.hardness * 180, platform.hardness * 50 // 10):
-                    if platform.break_level in range(i, i + platform.hardness * 50 // 10):
-                        display.blit(cracks[9 - loop_number], (platform.x + position_bias, platform.y))
-                        break
-                    loop_number += 1
+        if player.currently_breaked_block:
+            for platform in platforms:
+                if platform == player.currently_breaked_block:
+                    loop_number = 0
+                    for i in range(0, platform.hardness * 180, platform.hardness * 50 // 10):
+                        if platform.break_level in range(i, i + platform.hardness * 50 // 10):
+                            display.blit(cracks[9 - loop_number], (platform.x + position_bias, platform.y))
+                            break
+                        loop_number += 1
 
     def manage_ui_inventory():
         t = 0
@@ -636,9 +637,23 @@ def gameLoop():
 
         pg.display.update()
 
+    t = []
+    for x in range(0, 8000, 40):
+        for y in range(0, 1000, 40):
+            for platform in platforms:
+                if platform.x == x and platform.y == y:
+                    i = 0
+                    for h in all_blocks:
+                        if h == platform.texture:
+                            t.append([i, x, y, platform.diggable, platform.hardness, platform.break_level])
+                            break
+                        i += 1
+            t.append([None, x, y, False, 0, 0])
+    print(t)
+
     fps = 0
 
-    while not done:
+    while False:
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 done = True
@@ -685,7 +700,6 @@ def gameLoop():
                 enemy.collide_with_weapons()
 
         for grabbable in grabbables:
-            grabbable.change_bias()
             grabbable.move()
 
         for bullet in bullets:

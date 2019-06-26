@@ -1,6 +1,9 @@
-import pygame as pg
 import os
 import random
+
+import pygame as pg
+
+from starting_platforms import platforms
 
 os.environ['SDL_VIDEO_WINDOW_POS'] = "%d,%d" % (0, 30)
 
@@ -102,11 +105,11 @@ def gameLoop():
             self.wait_for_weapon = 0
             self.mask = pg.mask.from_surface(self.sprite)
             self.alive = True
-            self.inventory = [['Block', 64, dirt_block],
-                              ['Block', 64, wood_block],
-                              ['Block', 64, cobblestone_block],
-                              ['Block', 64, glass_block],
-                              ['Block', 64, log_block]]
+            self.inventory = [['Block', 64, 0],
+                              ['Block', 64, 2],
+                              ['Block', 64, 4],
+                              ['Block', 64, 5],
+                              ['Block', 64, 6]]
             self.currently_held_num = 0
             self.currently_held = self.inventory[self.currently_held_num]
             self.health = 10
@@ -191,30 +194,33 @@ def gameLoop():
         def break_a_block(self):
             if mouse_pressed[0]:
                 for platform in platforms:
-                    if mouse_x - position_bias - (mouse_x - position_bias) % 40 in range(platform.x, platform.x +
-                            platform.width) and mouse_y - mouse_y % 40 in range(platform.y, platform.y +
-                            platform.height) and platform.diggable:
+                    if mouse_x - position_bias - (mouse_x - position_bias) % 40 in range(platform[1], platform[1] +
+                            40) and mouse_y - mouse_y % 40 in range(platform[2], platform[2] +
+                            40) and platform[3]:
                         if ((mouse_x - self.x - position_bias) ** 2 + (mouse_y - self.y) ** 2) < 40000:
-                            platform.break_level -= 1
+                            platform[5] -= 1
                             self.currently_breaked_block = platform
-                            if platform.break_level == 0:
-                                grabbables.append(Grabbable(platform.x, platform.y, platform.texture))
+                            if platform[5] == 0:
+                                grabbables.append(Grabbable(platform[1], platform[2], platform[0]))
                                 platforms.remove(platform)
                         else:
-                            platform.break_level = platform.hardness * 50
+                            platform[5] = platform[4] * 50
                     else:
-                        platform.break_level = platform.hardness * 50
+                        platform[5] = platform[4] * 50
 
         def place_a_block(self):
             if mouse_pressed[2] and self.currently_held[0] == 'Block' and self.currently_held[1] > 0 and \
                     ((mouse_x - self.x - position_bias) ** 2 + (mouse_y - self.y) ** 2) < 40000:
                 for platform in platforms:
-                    if mouse_x - position_bias - (mouse_x - position_bias) % 40 in range(platform.x, platform.x +
-                        platform.width) and mouse_y - mouse_y % 40 in range(platform.y, platform.y + platform.height):
+                    if mouse_x - position_bias - (mouse_x - position_bias) % 40 in range(platform[1], platform[1] +
+                        40) and mouse_y - mouse_y % 40 in range(platform[2], platform[2] + 40):
                         return 0
-                platforms.append(Platform(mouse_x - position_bias, mouse_y, self.currently_held[2]))
-                offset = int(platforms[-1].x - self.x), int(platforms[-1].y - self.y)
-                if self.mask.overlap(pg.mask.from_surface(platforms[-1].texture), offset):
+                platforms.append([self.currently_held[2], mouse_x - position_bias - (mouse_x - position_bias) % 40,
+                                  mouse_y - mouse_y % 40, True])
+                platforms[-1].append(define_hardnes_and_break_level(self.currently_held[2])[0])
+                platforms[-1].append(define_hardnes_and_break_level(self.currently_held[2])[1])
+                offset = int(platforms[-1][1] - self.x), int(platforms[-1][2] - self.y)
+                if self.mask.overlap(pg.mask.from_surface(all_blocks[platforms[-1][0]]), offset):
                     platforms.pop(-1)
                 else:
                     self.currently_held[1] -= 1
@@ -238,27 +244,28 @@ def gameLoop():
 
         def collide_with_platforms(self):
             for platform in platforms:
-                if platform.x - 41 < self.x < platform.x + 81 and platform.y - 81 < self.y < platform.y + 121:
-                    if (int(self.x) + self.width == platform.x or int(self.x) == platform.x + platform.width) and (self.y <
-                            platform.y < int(self.y + self.height) or platform.y < int(self.y) < platform.y +
-                            platform.height):
+                if platform[1] - 41 < self.x < platform[1] + 81 and platform[2] - 81 < self.y < platform[2] + 121 and \
+                        platform[0] is not None:
+                    if (int(self.x) + self.width == platform[1] or int(self.x) == platform[1] + 40) and (self.y <
+                            platform[2] < int(self.y + self.height) or platform[2] < int(self.y) < platform[2] +
+                            40):
                         self.velx = 0
-                        if self.x < platform.x:
+                        if self.x < platform[1]:
                             self.x -= 1
                         else:
                             self.x += 1
 
-                    if self.x + self.width > platform.x and self.x < platform.x + platform.width and int(self.y) == \
-                            platform.y + platform.height:
+                    if self.x + self.width > platform[1] and self.x < platform[1] + 40 and int(self.y) == \
+                            platform[2] + 40:
                         self.vely *= -0.5
                         self.y += 1
 
-                    if platform.x - self.width < self.x < platform.x + platform.width and self.y <= platform.y \
+                    if platform[1] - self.width < self.x < platform[1] + 40 and self.y <= platform[2] \
                             <= self.y + self.height:
                         self.on_platform = True
                         self.jumped = False
                         self.vely = 0
-                        self.y = platform.y - self.height
+                        self.y = platform[2] - self.height
                         if self.try_to_jump and not self.jumped:
                             self.vely -= 15
                             self.y -= 1
@@ -419,21 +426,6 @@ def gameLoop():
 
     enemies = []
 
-    class Platform(object):
-        def __init__(self, x, y, texture=dirt_block, diggable=True):
-            self.x = x - x % 40
-            self.y = y - y % 40
-            self.width = 40
-            self.height = 40
-            self.texture = texture
-            self.diggable = diggable
-            self.hardness = 1
-            self.break_level = self.hardness * 50
-
-        def draw(self):
-            if self.texture:
-                display.blit(self.texture, (self.x + position_bias, self.y))
-
     class Grabbable(object):
         def __init__(self, x, y, type):
             self.x = x
@@ -442,16 +434,16 @@ def gameLoop():
             self.type = type
             self.y_bias = 1
             self.bias_direction = 1
-            self.mask = pg.mask.from_surface(self.type)
-            if self.type in all_blocks:
-                if self.type == grass_block:
-                    self.type = dirt_block
-                elif self.type == stone_block:
-                    self.type = cobblestone_block
+            self.mask = pg.mask.from_surface(all_blocks[self.type])
+            if all_blocks[self.type] in all_blocks:
+                if self.type == 1:
+                    self.type = 0
+                elif self.type == 3:
+                    self.type = 4
                 self.width = 20
                 self.height = 20
             else:
-                self.width, self.height = self.type.get_rect().size
+                self.width, self.height = all_blocks[self.type].get_rect().size
 
         def change_bias(self):
             if self.bias_direction == 1:
@@ -464,70 +456,32 @@ def gameLoop():
                     self.bias_direction *= -1
 
         def effect(self):
-            if self.type in all_blocks:
+            if all_blocks[self.type] in all_blocks:
                 for thing in player.inventory:
                     if self.type == thing[2]:
                         thing[1] += 1
                         return 0
-                player.inventory.append(['Block', 1, self.type])
+                i = 0
+                for block in all_blocks:
+                    if block == self.type:
+                        player.inventory.append(['Block', 1, i])
+                    i += 1
 
         def move(self):
             self.real_y += 1
             for platform in platforms:
-                if self.real_y + self.height + 19 == platform.y and self.x in \
-                        range(platform.x, platform.x + platform.width):
+                if self.real_y + self.height + 19 == platform[2] and self.x in \
+                        range(platform[1], platform[1] + 40):
                     self.real_y -= 1
                     grabbable.change_bias()
                     break
             self.y = self.real_y
 
         def draw(self):
-            if self.x in range(int(player.x) - width, int(player.x) + width):
-                if self.type in all_blocks:
-                    display.blit(pg.transform.scale(self.type, (20, 20)),
-                                 (self.x + position_bias + 10, self.y + self.y_bias))
+            display.blit(pg.transform.scale(all_blocks[self.type], (20, 20)), (self.x + position_bias + 10, self.y +
+                                                                       self.y_bias))
 
     bullets = []
-
-    platforms = []
-
-    for x in range(0, 7000, 40):
-        platforms.append(Platform(x, 720, grass_block))
-
-    for x in range(0, 7000, 40):
-        platforms.append(Platform(x, 760))
-
-    for x in range(0, 8000, 40):
-        for y in range(800, 961, 40):
-            platforms.append(Platform(x, y, stone_block))
-
-    for x in range(7000, 8000, 40):
-        for y in range(440, 481, 40):
-            platforms.append(Platform(x, y, stone_block, False))
-
-    for x in range(7000, 8000, 40):
-        for y in range(440, 481, 40):
-            platforms.append(Platform(x, y, stone_block, False))
-
-    for x in range(7080, 8000, 40):
-        for y in range(360, 401, 40):
-            platforms.append(Platform(x, y, stone_block, False))
-
-    for x in range(7240, 8000, 40):
-        for y in range(280, 321, 40):
-            platforms.append(Platform(x, y, stone_block, False))
-
-    for x in range(7320, 8000, 40):
-        for y in range(0, 241, 40):
-            platforms.append(Platform(x, y, stone_block, False))
-
-    for x in range(7000, 8000, 40):
-        for y in range(720, 761, 40):
-            platforms.append(Platform(x, y))
-
-    for y in range(0, 1000):
-        platforms.append(Platform(-40, y, False))
-        platforms.append(Platform(8000, y, False))
 
     decorations = [[shadow_cave, 7000, 520, True],
                    [stone_wall, 7000, 520, False],
@@ -562,22 +516,36 @@ def gameLoop():
             this_x -= 45
 
     def place_cracks():
-        for platform in platforms:
-            if platform == player.currently_breaked_block:
-                loop_number = 0
-                for i in range(0, platform.hardness * 180, platform.hardness * 50 // 10):
-                    if platform.break_level in range(i, i + platform.hardness * 50 // 10):
-                        display.blit(cracks[9 - loop_number], (platform.x + position_bias, platform.y))
-                        break
-                    loop_number += 1
+        if player.currently_breaked_block:
+            for platform in platforms:
+                if platform == player.currently_breaked_block:
+                    loop_number = 0
+                    for i in range(0, platform[4] * 50, platform[4] * 50 // 10):
+                        if platform[5] in range(i, i + platform[4] * 50 // 10):
+                            display.blit(cracks[9 - loop_number], (platform[1] + position_bias, platform[2]))
+                            break
+                        loop_number += 1
 
     def manage_ui_inventory():
         t = 0
         for i in player.inventory:
-            display.blit(i[2], (734 + t * 50, 885))
+            display.blit(all_blocks[i[2]], (734 + t * 50, 885))
             display.blit(font.render(str(i[1]), True, pg.Color('white')), (750 + t * 50, 908))
             t += 1
         display.blit(slot_focus, (729 + player.currently_held_num * 50, 880))
+
+    def define_hardnes_and_break_level(block):
+        hardness = 1
+        if block == 0 or block == 1:
+            hardness = 1
+        if block == 2 or block == 6 or block == 4:
+            hardness = 4
+        if block == 3:
+            hardness = 3
+        if block == 5:
+            hardness = 1
+        break_level = hardness * 25
+        return [hardness, break_level]
 
     def death_scene():
         while True:
@@ -622,7 +590,8 @@ def gameLoop():
             grabbable.draw()
 
         for platform in platforms:
-            platform.draw()
+            if platform[0] is not None:
+                display.blit(all_blocks[platform[0]], (platform[1] + position_bias, platform[2]))
 
         for decor in decorations:
             if decor[3]:
